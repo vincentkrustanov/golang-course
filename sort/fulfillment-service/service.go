@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -11,6 +10,7 @@ import (
 )
 
 //TODO: functional tests with grpc mocks
+//TODO: implement the error handling with the provided structure
 
 const cubbiesCnt = 10
 
@@ -39,7 +39,6 @@ func newFulfillmentService(client gen.SortingRobotClient) gen.FulfillmentServer 
 	return ffs
 }
 
-//TODO:DONE FullfillmentCountStatus
 type fullfillmentCountStatus struct {
 	orderStatus             *gen.FullfillmentStatus
 	numberOfSuccessfulPicks int
@@ -71,14 +70,12 @@ func (fs *fulfillmentService) processItemsToCubbies(ctx context.Context, itemsTo
 
 			resp, err := fs.sortingRobot.PickItem(ctx, &gen.Empty{})
 			if err != nil {
-				//TODO: implement the error handling
-				//return &FulfillmentFailedError{}
 				return fmt.Errorf("pick item failed: %v", err)
 			}
 
 			itemCodes = append(itemCodes, resp.Item.Code)
 
-			cubbyID, err := fs.getCubbyForItem(resp.Item, itemsToOrders)
+			cubbyID, err := getCubbyForItem(resp.Item, itemsToOrders)
 			if err != nil {
 				return fmt.Errorf("process items to cubbies failed: %v", err)
 			}
@@ -108,14 +105,14 @@ func (fs *fulfillmentService) processItemsToCubbies(ctx context.Context, itemsTo
 func (fs *fulfillmentService) GetOrderStatusById(ctx context.Context, req *gen.OrderIdRequest) (*gen.OrdersStatusResponse, error) {
 	var result gen.OrdersStatusResponse
 	fs.lock.Lock()
-	defer fs.lock.RUnlock()
+	defer fs.lock.Unlock()
 	result.Status = append(result.Status, fs.ordersCountStatus[req.OrderId].orderStatus)
 	return &result, nil
 }
 func (fs *fulfillmentService) GetAllOrdersStatus(context.Context, *gen.Empty) (*gen.OrdersStatusResponse, error) {
 	var result gen.OrdersStatusResponse
 	fs.lock.Lock()
-	defer fs.lock.RUnlock()
+	defer fs.lock.Unlock()
 	for _, order := range fs.ordersCountStatus {
 		result.Status = append(result.Status, order.orderStatus)
 	}
@@ -131,7 +128,7 @@ func (fs *fulfillmentService) LoadOrders(ctx context.Context, in *gen.LoadOrders
 		fs.workCh <- in.Orders
 	}()
 
-	return nil, errors.New("not implemented")
+	return &gen.CompleteResponse{}, nil
 }
 
 func (fs *fulfillmentService) processOrders(orders []*gen.Order) {
@@ -190,7 +187,7 @@ func mapOrderToCubby(usedCubbies map[string]bool, id string, cubbiesCnt int) str
 	}
 }
 
-func (fs *fulfillmentService) getCubbyForItem(item *gen.Item, itemsToOrders map[string]string) (string, error) {
+func getCubbyForItem(item *gen.Item, itemsToOrders map[string]string) (string, error) {
 	orderId := itemsToOrders[item.Code]
 	if orderId == "" {
 		return orderId, fmt.Errorf("item %s -> %s not found", item.Code, item.Label)
