@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/preslavmihaylov/ordertocubby"
 	"github.com/vincentkrustanov/go_sort/tree/master/sort/gen"
@@ -28,6 +29,7 @@ func startWorker(work func([]*gen.Order)) chan []*gen.Order {
 func newFulfillmentService(client gen.SortingRobotClient) gen.FulfillmentServer {
 	ffs := &fulfillmentService{
 		sortingRobot:      client,
+		usedCubbies:       make(map[string]bool),
 		ordersCountStatus: make(map[string]*fullfillmentCountStatus),
 		lock:              sync.RWMutex{},
 	}
@@ -58,6 +60,7 @@ func (fcs *fullfillmentCountStatus) updateStatus() {
 type fulfillmentService struct {
 	sortingRobot      gen.SortingRobotClient
 	workCh            chan []*gen.Order
+	usedCubbies       map[string]bool
 	ordersCountStatus map[string]*fullfillmentCountStatus
 	lock              sync.RWMutex
 }
@@ -86,6 +89,7 @@ func (fs *fulfillmentService) processItemsToCubbies(ctx context.Context, itemsTo
 			if err != nil {
 				return fmt.Errorf("place in cubby failed: %v", err)
 			}
+			time.Sleep(3 * time.Second)
 
 			fs.lock.Lock()
 			fs.ordersCountStatus[itemsToOrders[resp.Item.Code]].incrementSuccessfulPicks()
@@ -140,12 +144,11 @@ func (fs *fulfillmentService) processOrders(orders []*gen.Order) {
 
 func (fs *fulfillmentService) mapOrdersToCubbies(orders []*gen.Order) map[string]string {
 	ordersToCubbies := map[string]string{}
-	usedCubbies := map[string]bool{}
 
 	for _, order := range orders {
-		cubbyID := mapOrderToCubby(usedCubbies, order.Id, cubbiesCnt)
+		cubbyID := mapOrderToCubby(fs.usedCubbies, order.Id, cubbiesCnt)
 		ordersToCubbies[order.Id] = cubbyID
-		usedCubbies[cubbyID] = true
+		fs.usedCubbies[cubbyID] = true
 
 		fs.lock.Lock()
 		fs.ordersCountStatus[order.Id] = &fullfillmentCountStatus{
