@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package fulfillment;
+option go_package = "github.com/vincentkrustanov/go_sort/tree/master/sort/gen";
+
+import "types.proto";
+
+service Fulfillment {
+    // Sync implementation
+    rpc LoadOrders(LoadOrdersRequest) returns (CompleteResponse);
+    rpc GetOrderStatusById(OrderIdRequest) returns (OrdersStatusResponse);
+    rpc GetAllOrdersStatus(types.Empty) returns (OrdersStatusResponse);
+    rpc MarkFullfilled(OrderIdRequest) returns (types.Empty);
+}
+
+enum OrderState {
+    PENDING = 0;
+    READY = 1;
+    FAILED = 2;
+}
+
+message FullfillmentStatus {
+    types.Cubby cubby = 1;
+    types.Order order = 2;
+    OrderState state = 3;
+}
+
+message OrderIdRequest {
+    string orderId = 1;
+}
+
+message OrdersStatusResponse {
+    repeated FullfillmentStatus status = 1;
+}
+
+message PreparedOrder {
+    types.Order order = 1;
+    types.Cubby cubby = 2;
+}
+
+message CompleteResponse {
+    string status = 1;
+    repeated PreparedOrder orders = 2;
+}
+
+message LoadOrdersRequest {
+    repeated types.Order orders = 1;
+}
