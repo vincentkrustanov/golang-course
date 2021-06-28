@@ -1,0 +1,1 @@
+grpcurl -plaintext -d '{}' localhost:10001 fulfillment.Fulfillment.GetAllOrdersStatus
