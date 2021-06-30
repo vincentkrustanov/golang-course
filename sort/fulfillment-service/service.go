@@ -66,7 +66,6 @@ type fulfillmentService struct {
 }
 
 func (fs *fulfillmentService) processItemsToCubbies(ctx context.Context, itemsToOrders map[string]string, ordersToCubbies map[string]string, orders []*gen.Order) error {
-	var itemCodes []string
 	for _, order := range orders {
 		for _, item := range order.Items {
 			_ = item
@@ -75,8 +74,6 @@ func (fs *fulfillmentService) processItemsToCubbies(ctx context.Context, itemsTo
 			if err != nil {
 				return fmt.Errorf("pick item failed: %v", err)
 			}
-
-			itemCodes = append(itemCodes, resp.Item.Code)
 
 			cubbyID, err := getCubbyForItem(resp.Item, itemsToOrders)
 			if err != nil {
@@ -96,13 +93,6 @@ func (fs *fulfillmentService) processItemsToCubbies(ctx context.Context, itemsTo
 			fs.lock.Unlock()
 		}
 	}
-	_, err := fs.sortingRobot.RemoveItemsByCode(ctx, &gen.RemoveItemsRequest{
-		ItemCodes: itemCodes,
-	})
-	if err != nil {
-		return fmt.Errorf("remove items by code failed: %v", err)
-	}
-
 	return nil
 }
 
